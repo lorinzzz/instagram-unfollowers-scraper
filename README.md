@@ -1,6 +1,8 @@
 # instagram-unfollowers-scraper
-This python script can automatically scrape an Instagram users' followers and followings and save them to a text file. It will also
+This python script automatically scrapes an Instagram users' followers and followings and save them to a text file. It will also
 generate a list users that do not follow back as well as users the specific account does not follow back.
+
+The script uses Selenium with the driver as Chrome, and utilizes multiprocessing to scrape in parallel.
 
 # How to use:
 1. Install requirements using terminal or command line. You should run this command ```pip install -r requirements.txt```.
