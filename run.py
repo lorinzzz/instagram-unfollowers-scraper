@@ -16,6 +16,7 @@ PASSWORD = 'XXX'
 TIMEOUT = 15
 FOLLOWINGS = 0
 FOLLOWERS = 1
+RETRY_LIMIT = 10
 
 def automate_login(bot):
     bot.get('https://www.instagram.com/accounts/login/')
@@ -85,7 +86,7 @@ def scrape_follow(bot, usr, scrape):
 
     users = set()
     
-    while True: # refresh and scrape until found all users
+    for _ in range(RETRY_LIMIT): # retry to find all users
         for _ in range(round(total_users // 15)):
             ActionChains(bot).send_keys(Keys.END).perform()
             time.sleep(1)
