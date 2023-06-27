@@ -8,6 +8,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.keys import Keys
 from webdriver_manager.chrome import ChromeDriverManager
 from multiprocessing import Pool
+import argparse
+parser = argparse.ArgumentParser()
+
+parser.add_argument('--mp', type=bool, default=False, help='enable multiprocessing')
+args = parser.parse_args()
 
 # Complete these 2 fields ==================
 USERNAME = 'XXX'
@@ -16,7 +21,7 @@ PASSWORD = 'XXX'
 TIMEOUT = 15
 FOLLOWINGS = 0
 FOLLOWERS = 1
-RETRY_LIMIT = 10
+SERIAL_PROCESS = 0 if args.mp else 2
 
 def automate_login(bot):
     bot.get('https://www.instagram.com/accounts/login/')
@@ -63,6 +68,8 @@ def automate_login(bot):
     time.sleep(5)
 
 def scrape_follow(bot, usr, scrape):
+    serial = True if scrape == SERIAL_PROCESS else False
+    
     if scrape == FOLLOWINGS:
         scrape = "following"
     else:
@@ -74,20 +81,20 @@ def scrape_follow(bot, usr, scrape):
     
     element = WebDriverWait(bot, TIMEOUT).until(
         EC.presence_of_element_located((
-            By.XPATH, f"//a[contains(@href, '/{scrape}')]")))
+            By.XPATH, f'//a[contains(@href, "/{scrape}")]')))
     
     # get total followings/followers
     total_users = int(((element.text).split(' ')[0]).replace(',', '')) # cover comma separated numbers
     element.click()
 
-    time.sleep(2)
+    time.sleep(7.5)
 
     print(f'[Info] - Scraping {total_users} {scrape}...')
 
     users = set()
     
-    for _ in range(RETRY_LIMIT): # retry to find all users
-        for _ in range(round(total_users // 15)):
+    while True: # refresh and scrape until found all users
+        for _ in range(round(total_users // 12)):
             ActionChains(bot).send_keys(Keys.END).perform()
             time.sleep(1)
             
@@ -108,29 +115,71 @@ def scrape_follow(bot, usr, scrape):
             EC.presence_of_element_located((
                 By.XPATH, f"//a[contains(@href, '/{scrape}')]")))       
         element.click()
-        
-     
-    print(f'[Info] - Saving {scrape}...')
-
-    with open(f'{scrape}.txt', 'w') as file:
-        file.write('\n'.join(users) + "\n")
-
-    print(f'[DONE] - Your {scrape} are saved in {scrape}.txt file!')
+        time.sleep(7.5)
     
-    return users
+    if serial:
+        followers = users
+        followings = scrape_follow(bot, usr, FOLLOWINGS)
+        return followers, followings
+    else:
+        return users
 
-def process_differences(followings, followers):
+def process_differences(usr, followings, followers):
     print('[Info] Processing differences...')
+
+    FollowingsFile = f"{usr}_Followings.txt"
+    NewFollowingsFile = f"{usr}_NewFollowings.txt"
+    NewUnfollowingsFile = f"{usr}_NewUnfollowings.txt"
+    FollowersFile = f"{usr}_Followers.txt"
+    NewFollowersFile = f"{usr}_NewFollowers.txt"
+    NewUnfollowersFile = f"{usr}_NewUnfollowers.txt"
+    FollowingNotInFollowersFile = f"{usr}_FollowingNotInFollowers.txt"
+    FollowersNotInFollowingFile = f"{usr}_FollowersNotInFollowing.txt"
+    
+    try:
+        with open(FollowingsFile, 'r') as file:
+            old_followings = set(line.strip() for line in file)
+            new_followings = followings.difference(old_followings)
+            new_unfollowings = old_followings.difference(followings)
+            with open(NewFollowingsFile, 'w') as file:
+                file.write('\n'.join(new_followings) + "\n")
+                print(f'[Done] - Your New Followings are saved in {NewFollowingsFile} file!')
+            with open(NewUnfollowingsFile, 'w') as file:
+                file.write('\n'.join(new_unfollowings) + "\n")
+                print(f'[Done] - Your New Unfollowings are saved in {NewUnfollowingsFile} file!') 
+    except:
+        print("[Info] - No existing Followings file...")
+    with open(FollowingsFile, 'w') as file:
+        file.write('\n'.join(followings) + "\n")
+        print(f'[Done] - Your Followings are saved in {FollowingsFile} file!')        
+    
+    try:
+        with open(FollowersFile, 'r') as file:
+            old_followers = set(line.strip() for line in file)
+        new_followers = followers.difference(old_followers)
+        new_unfollowers = old_followers.difference(followers)
+        with open(NewFollowersFile, 'w') as file:
+            file.write('\n'.join(new_followers) + "\n")
+            print(f'[Done] - Your New Followers are saved in {NewFollowersFile} file!')
+        with open(NewUnfollowersFile, 'w') as file:
+            file.write('\n'.join(new_unfollowers) + "\n")
+            print(f'[Done] - Your New Unfollowers are saved in {NewUnfollowersFile} file!') 
+    except:
+        print("[Info] - No existing Followers file...")
+    with open(FollowersFile, 'w') as file:
+        file.write('\n'.join(followers) + "\n")
+        print(f'[Done] - Your Followers are saved in {FollowersFile} file!')
+    
     d1 = followings.difference(followers) # people you follow that doesn't follow you back
     d2 = followers.difference(followings) # people you don't follow that follows you
     
-    with open('FollowingNotInFollowers.txt', 'w') as file:
-        file.write('\n'.join(d1) + "\n")   
+    with open(FollowingNotInFollowersFile, 'w') as file:
+        file.write('\n'.join(d1) + "\n")
 
-    with open('FollowersNotInFollowing.txt', 'w') as file:
-        file.write('\n'.join(d2) + "\n") 
+    with open(FollowersNotInFollowingFile, 'w') as file:
+        file.write('\n'.join(d2) + "\n")  
     
-    print('[Done] Saved differences to FollowingNotInFollowers.txt and FollowersNotInFollowing.txt files') 
+    print(f'[Done] Saved differences to {FollowingNotInFollowersFile}, {FollowersNotInFollowingFile}') 
     
 
 def create_bot_and_scrape(usr, scrape):
@@ -144,7 +193,6 @@ def create_bot_and_scrape(usr, scrape):
 
     bot = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     
-    
     automate_login(bot)
     
     return scrape_follow(bot, usr, scrape)    
@@ -154,17 +202,20 @@ def scrape():
 
     usr = input('[Required] - Enter username of account to scrape: ')
     
-    p = Pool(2)
-    res1 = p.apply_async(func=create_bot_and_scrape, args=(usr, FOLLOWERS))
-    time.sleep(5) # avoid logging in simulataneously
-    res2 = p.apply_async(func=create_bot_and_scrape, args=(usr, FOLLOWINGS))
+    if args.mp:
+        p = Pool(2)
+        res1 = p.apply_async(func=create_bot_and_scrape, args=(usr, FOLLOWERS))
+        time.sleep(5) # avoid logging in simulataneously
+        res2 = p.apply_async(func=create_bot_and_scrape, args=(usr, FOLLOWINGS))
+        
+        followers_set = res1.get()
+        followings_set = res2.get()
+        p.close()
+        p.join()
+    else:
+        followers_set, followings_set = create_bot_and_scrape(usr, SERIAL_PROCESS)
     
-    followers_set = res1.get()
-    followings_set = res2.get()
-    p.close()
-    p.join()
-    
-    process_differences(followings_set, followers_set)
+    process_differences(usr, followings_set, followers_set)
     
     print('[Done] Scraping all done!!!')
 
