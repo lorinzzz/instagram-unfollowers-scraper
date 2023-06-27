@@ -102,7 +102,7 @@ def scrape_follow(bot, usr, scrape):
         user_elements = bot.find_elements(By.XPATH,
         "//div[@class='x9f619 xjbqb8w x1rg5ohu x168nmei x13lgxp2 x5pf9jr xo71vjh x1n2onr6 x1plvlek xryxfnj x1c4vz4f x2lah0s x1q0g3np xqjyukv x6s0dn4 x1oa3qoh x1nhvcw1']")
         
-        # get ig username
+        # get ig usernames
         for e in user_elements:
             users.add(e.text)
             
@@ -127,15 +127,17 @@ def scrape_follow(bot, usr, scrape):
 def process_differences(usr, followings, followers):
     print('[Info] Processing differences...')
 
-    FollowingsFile = f"{usr}_Followings.txt"
-    NewFollowingsFile = f"{usr}_NewFollowings.txt"
-    NewUnfollowingsFile = f"{usr}_NewUnfollowings.txt"
-    FollowersFile = f"{usr}_Followers.txt"
-    NewFollowersFile = f"{usr}_NewFollowers.txt"
-    NewUnfollowersFile = f"{usr}_NewUnfollowers.txt"
-    FollowingNotInFollowersFile = f"{usr}_FollowingNotInFollowers.txt"
-    FollowersNotInFollowingFile = f"{usr}_FollowersNotInFollowing.txt"
+    FollowingsFile = f"{usr}_Followings.txt" # all user's followings
+    NewFollowingsFile = f"{usr}_NewFollowings.txt" # all new followings since old
+    NewUnfollowingsFile = f"{usr}_NewUnfollowings.txt" # all people don't follow anymore since old
+    FollowersFile = f"{usr}_Followers.txt" # all user's followers
+    NewFollowersFile = f"{usr}_NewFollowers.txt" # all new followers since old 
+    NewUnfollowersFile = f"{usr}_NewUnfollowers.txt" # all people that have unfollowed you since old
+    FollowingNotInFollowersFile = f"{usr}_FollowingNotInFollowers.txt" # people you follow that doesn't follow you back
+    FollowersNotInFollowingFile = f"{usr}_FollowersNotInFollowing.txt" # people that follow you that you don't follow back
     
+    # compare new set with old set if exists
+    # then write the new set to file
     try:
         with open(FollowingsFile, 'r') as file:
             old_followings = set(line.strip() for line in file)
@@ -169,9 +171,9 @@ def process_differences(usr, followings, followers):
     with open(FollowersFile, 'w') as file:
         file.write('\n'.join(followers) + "\n")
         print(f'[Done] - Your Followers are saved in {FollowersFile} file!')
-    
-    d1 = followings.difference(followers) # people you follow that doesn't follow you back
-    d2 = followers.difference(followings) # people you don't follow that follows you
+        
+    d1 = followings.difference(followers)
+    d2 = followers.difference(followings)
     
     with open(FollowingNotInFollowersFile, 'w') as file:
         file.write('\n'.join(d1) + "\n")
